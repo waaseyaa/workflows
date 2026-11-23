@@ -82,14 +82,16 @@ final class WorkflowRepublishListener
             return;
         }
 
-        // The returned freshly-promoted entity isn't needed here — the
-        // caller already has $entity in memory — but the call's return
-        // value is captured (not discarded) to satisfy the "don't discard
-        // a meaningful return value" static-analysis rule (same convention
-        // TransitionService's own promote branch follows for the identical
-        // call).
         $expected = $entity instanceof EntityBase ? $entity->mutationToken() : null;
         $promoted = $repository->setPublishedRevision((string) $id, $revisionId, $expected);
+        $entity->set('published_revision_id', $revisionId);
+
+        // The save response serializes the original entity. Carry forward the
+        // token issued by this promotion, before the client attempts another save.
+        $successor = $promoted instanceof EntityBase ? $promoted->mutationToken() : null;
+        if ($entity instanceof EntityBase && $successor !== null) {
+            $entity->_hydrateMutationToken($successor);
+        }
     }
 
     /**
